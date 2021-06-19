@@ -9,11 +9,11 @@
 
 project(jni-utils)
 
-include_directories(
-  include
-)
-
 add_library(jni-utils STATIC
   src/jni_utils.cpp
+  src/jni_method.cpp
   src/jni_class.cpp
+)
+target_include_directories(jni-utils PUBLIC
+  include
 )
