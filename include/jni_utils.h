@@ -12,6 +12,7 @@
 
 #include <jni.h>
 #include <string>
+#include <map>
 #include <jni_as.h>
 #include <jni_class.h>
 #include <jni_method.h>
@@ -75,6 +76,77 @@ namespace jni {
   #undef JNI_ARRAY_RELEASE
 
   #undef JNI_ARRAY
+
+  // Object wrapper
+
+  class Object {
+  private:
+    JNIEnv *env;
+    jobject obj;
+    jclass clazz;
+    std::map<std::string, jfieldID> cachedFields;
+    const bool cacheFields;
+
+    jfieldID findField (const char *fieldName, const char *sig) {
+      if (!cacheFields) {
+        return env->GetFieldID(clazz, fieldName, sig);
+      }
+      std::string key = std::string(fieldName) + "_" + std::string(sig);
+      auto itr = cachedFields.find(key);
+      if (itr != cachedFields.end()) {
+        return itr->second;
+      }
+      jfieldID fieldId = env->GetFieldID(clazz, fieldName, sig);
+      cachedFields[key] = fieldId;
+      return fieldId;
+    }
+
+  public:
+    Object (JNIEnv *env, jobject obj,
+            bool cacheFields = false) : Object(
+      env,
+      obj,
+      env->GetObjectClass(obj),
+      cacheFields
+    ) { }
+
+    Object (JNIEnv *env, jobject obj, jclass clazz,
+            bool cacheFields = false) :
+            env(env), obj(obj), clazz(clazz),
+            cacheFields(cacheFields) { }
+
+    jint getInt (const char *fieldName) {
+      return env->GetIntField(obj, findField(fieldName, "I"));
+    }
+
+    jlong getLong (const char *fieldName) {
+      return env->GetLongField(obj, findField(fieldName, "J"));
+    }
+
+    jboolean getBoolean (const char *fieldName) {
+      return env->GetBooleanField(obj, findField(fieldName, "Z"));
+    }
+
+    jdouble getDouble (const char *fieldName) {
+      return env->GetDoubleField(obj, findField(fieldName, "D"));
+    }
+
+    jbyteArray getByteArray (const char *fieldName) {
+      return (jbyteArray) env->GetObjectField(obj, findField(fieldName, "[B"));
+    }
+
+    jintArray getIntArray (const char *fieldName) {
+      return (jintArray) env->GetObjectField(obj, findField(fieldName, "[I"));
+    }
+
+    jstring getString (const char *fieldName) {
+      return (jstring) env->GetObjectField(obj, findField(fieldName, "Ljava/lang/String;"));
+    }
+
+    jobjectArray getObjectArray (const char *fieldName) {
+      return (jobjectArray) env->GetObjectField(obj, findField(fieldName, "[Ljava/lang/Object;"));
+    }
+  };
 }
 
 #endif //JNI_UTILS_H
