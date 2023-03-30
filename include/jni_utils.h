@@ -85,20 +85,37 @@ namespace jni {
     jobject obj;
     jclass clazz;
     std::map<std::string, jfieldID> cachedFields;
-    const bool cacheFields;
+    std::map<std::string, jmethodID> cachedMethods;
+    const bool cacheEnabled;
 
     jfieldID findField (const char *fieldName, const char *sig) {
-      if (!cacheFields) {
+      if (!cacheEnabled) {
         return env->GetFieldID(clazz, fieldName, sig);
       }
       std::string key = std::string(fieldName) + "_" + std::string(sig);
       auto itr = cachedFields.find(key);
       if (itr != cachedFields.end()) {
         return itr->second;
+      } else {
+        jfieldID fieldId = env->GetFieldID(clazz, fieldName, sig);
+        cachedFields[key] = fieldId;
+        return fieldId;
       }
-      jfieldID fieldId = env->GetFieldID(clazz, fieldName, sig);
-      cachedFields[key] = fieldId;
-      return fieldId;
+    }
+
+    jmethodID findMethod (const char *methodName, const char *sig) {
+      if (!cacheEnabled) {
+        return env->GetMethodID(clazz, methodName, sig);
+      }
+      std::string key = std::string(methodName) + "_" + std::string(sig);
+      auto itr = cachedMethods.find(key);
+      if (itr != cachedMethods.end()) {
+        return itr->second;
+      } else {
+        jmethodID methodId = env->GetMethodID(clazz, methodName, sig);
+        cachedMethods[key] = methodId;
+        return methodId;
+      }
     }
 
   public:
@@ -112,8 +129,17 @@ namespace jni {
 
     Object (JNIEnv *env, jobject obj, jclass clazz,
             bool cacheFields = false) :
-            env(env), obj(obj), clazz(clazz),
-            cacheFields(cacheFields) { }
+      env(env), obj(env->NewGlobalRef(obj)), clazz(clazz),
+      cacheEnabled(cacheFields) { }
+    ~Object () {
+      env->DeleteGlobalRef(obj);
+    }
+
+    jobject getThis () {
+      return obj;
+    }
+
+    // Getters
 
     jint getInt (const char *fieldName) {
       return env->GetIntField(obj, findField(fieldName, "I"));
@@ -143,8 +169,52 @@ namespace jni {
       return (jstring) env->GetObjectField(obj, findField(fieldName, "Ljava/lang/String;"));
     }
 
-    jobjectArray getObjectArray (const char *fieldName) {
-      return (jobjectArray) env->GetObjectField(obj, findField(fieldName, "[Ljava/lang/Object;"));
+    Object getObject (const char *fieldName, const char *sig = "Ljava/lang/Object;") {
+      return Object(env, getRawObject(fieldName, sig));
+    }
+
+    jobject getRawObject (const char *fieldName, const char *sig = "Ljava/lang/Object;") {
+      return env->GetObjectField(obj, findField(fieldName, sig));
+    }
+
+    jobjectArray getObjectArray (const char *fieldName, const char *sig = "[Ljava/lang/Object;") {
+      return (jobjectArray) env->GetObjectField(obj, findField(fieldName, sig));
+    }
+
+    // Setters
+
+    void setInt (const char *fieldName, jint value) {
+      env->SetIntField(obj, findField(fieldName, "I"), value);
+    }
+
+    void setLong (const char *fieldName, jlong value) {
+      env->SetLongField(obj, findField(fieldName, "J"), value);
+    }
+
+    // Methods
+
+    void callVoid (const char *methodName) {
+      env->CallVoidMethod(obj, findMethod(methodName, "()V"));
+    }
+
+    void callVoid (const char *methodName, jint arg1) {
+      env->CallVoidMethod(obj, findMethod(methodName, "(I)V"), arg1);
+    }
+
+    void callVoid (const char *methodName, jboolean arg1) {
+      env->CallVoidMethod(obj, findMethod(methodName, "(Z)V"), arg1);
+    }
+
+    void callVoid (const char *methodName, jfloat arg1) {
+      env->CallVoidMethod(obj, findMethod(methodName, "(F)V"), arg1);
+    }
+
+    void callVoid (const char *methodName, jbyteArray arg1) {
+      env->CallVoidMethod(obj, findMethod(methodName, "(I[)V"), arg1);
+    }
+
+    jbyteArray callByteArray (const char *methodName, jint arg1) {
+      return (jbyteArray) env->CallObjectMethod(obj, findMethod(methodName, "(I)[B"), arg1);
     }
   };
 }
