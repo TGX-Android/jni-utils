@@ -210,7 +210,7 @@ namespace jni {
     }
 
     void callVoid (const char *methodName, jbyteArray arg1) {
-      env->CallVoidMethod(obj, findMethod(methodName, "(I[)V"), arg1);
+      env->CallVoidMethod(obj, findMethod(methodName, "([B)V"), arg1);
     }
 
     jbyteArray callByteArray (const char *methodName, jint arg1) {
